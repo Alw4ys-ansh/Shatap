@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>You're Stuck With Me 😡❤️</title>
+<style>
+  :root {
+    --pink: #ff4d8d;
+    --pink-dark: #cc1f5c;
+    --pink-glow: rgba(255,77,141,0.4);
+    --red: #ff2244;
+    --bg: #0a0008;
+    --bg2: #110010;
+    --text: #ffe0f0;
+    --muted: #a06080;
+    --white: #fff0f8;
+  }
+
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  #app {
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+
+  /* ─── SCENES ─── */
+  /* Hidden by default via display:none — opacity used only for the fade animation */
+  .scene {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(20px, 6vw, 40px) clamp(20px, 6vw, 32px);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    overflow: hidden;
+  }
+  /* .visible turns on display:flex; .active then fades it in */
+  .scene.visible {
+    display: flex;
+  }
+  .scene.active {
+    opacity: 1;
+  }
+
+  /* ─── FLOATING HEARTS (decorative only) ─── */
+  .floating-hearts {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+  }
+  .fh {
+    position: absolute;
+    animation: float-up linear infinite;
+    opacity: 0;
+  }
+  @keyframes float-up {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
+    10%  { opacity: 0.4; }
+    90%  { opacity: 0.15; }
+    100% { transform: translateY(-100vh) rotate(20deg); opacity: 0; }
+  }
+
+  /* ─── SHARED ANIMATIONS ─── */
+  @keyframes pulse-heart {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.18); }
+  }
+  @keyframes shake {
+    0%,  100% { transform: translateX(0); }
+    15%  { transform: translateX(-10px) rotate(-1deg); }
+    30%  { transform: translateX(10px)  rotate(1deg); }
+    45%  { transform: translateX(-8px); }
+    60%  { transform: translateX(8px); }
+    75%  { transform: translateX(-4px); }
+    90%  { transform: translateX(4px); }
+  }
+  .shaking { animation: shake 0.5s ease; }
+  @keyframes particle-burst {
+    0%   { transform: translate(0,0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+  }
+  .particle {
+    position: fixed;
+    pointer-events: none;
+    font-size: 20px;
+    animation: particle-burst 0.7s ease forwards;
+    z-index: 100;
+  }
+
+  /* ─── BUTTONS ─── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 36px;
+    border: none;
+    border-radius: 50px;
+    font-size: clamp(14px, 4vw, 17px);
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    letter-spacing: 0.5px;
+    touch-action: manipulation;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--pink-dark), var(--pink));
+    color: #fff;
+    box-shadow: 0 0 20px var(--pink-glow), 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 0 32px var(--pink-glow), 0 6px 20px rgba(0,0,0,0.4);
+  }
+  .btn-option {
+    width: min(300px, 85vw);
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+    border: 1.5px solid rgba(255,77,141,0.3);
+    box-shadow: none;
+  }
+  .btn-option:hover  { border-color: var(--pink); box-shadow: 0 0 12px var(--pink-glow); }
+  .btn-option.correct { background: rgba(255,77,141,0.15); border-color: var(--pink); }
+  .btn-option.wrong   { background: rgba(255,34,68,0.1);   border-color: var(--red); }
+
+  /* ══════════════════════════════════════
+     LOADING
+  ══════════════════════════════════════ */
+  #scene-loading {
+    background: var(--bg);
+    z-index: 10;
+    gap: clamp(12px, 4vw, 20px);
+  }
+  .loading-icon {
+    font-size: clamp(44px, 12vw, 64px);
+    animation: pulse-heart 1.2s ease-in-out infinite;
+    line-height: 1;
+  }
+  .loading-text {
+    font-size: clamp(11px, 3vw, 14px);
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    min-height: 1.5em;
+    text-align: center;
+    transition: opacity 0.4s;
+  }
+  .progress-bar-wrap {
+    width: min(280px, 80vw);
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: clamp(8px, 2vw, 14px);
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--pink-dark), var(--pink));
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.12s linear;
+    box-shadow: 0 0 8px var(--pink-glow);
+  }
+
+  /* ══════════════════════════════════════
+     START
+  ══════════════════════════════════════ */
+  #scene-start { background: var(--bg); }
+  .start-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(10px, 3vw, 18px);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+  }
+  .start-emoji {
+    font-size: clamp(44px, 14vw, 72px);
+    animation: pulse-heart 1.5s ease-in-out infinite;
+    line-height: 1;
+  }
+  .title-main {
+    font-size: clamp(26px, 7.5vw, 42px);
+    font-weight: 800;
+    color: var(--white);
+    line-height: 1.2;
+    text-shadow: 0 0 24px var(--pink-glow), 0 0 48px rgba(255,77,141,0.2);
+  }
+  .subtitle {
+    font-size: clamp(12px, 3.5vw, 15px);
+    color: var(--muted);
+    letter-spacing: 1.5px;
+  }
+
+  /* ══════════════════════════════════════
+     QUIZ
+  ══════════════════════════════════════ */
+  #scene-quiz { background: var(--bg2); }
+  .quiz-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 400px;
+  }
+  .progress-dots {
+    display: flex;
+    gap: 10px;
+    margin-bottom: clamp(20px, 5vw, 32px);
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+  .dot.done {
+    background: var(--pink);
+    box-shadow: 0 0 6px var(--pink-glow);
+  }
+  .quiz-q-num {
+    font-size: clamp(10px, 2.8vw, 12px);
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: clamp(12px, 3vw, 20px);
+    text-align: center;
+  }
+  .quiz-question {
+    font-size: clamp(20px, 5.5vw, 30px);
+    font-weight: 700;
+    text-align: center;
+    color: var(--white);
+    margin-bottom: clamp(24px, 6vw, 40px);
+    text-shadow: 0 0 20px var(--pink-glow);
+    line-height: 1.4;
+    transition: opacity 0.3s;
+    width: 100%;
+  }
+  .quiz-options {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+  .wrong-msg {
+    font-size: clamp(12px, 3.5vw, 14px);
+    color: #ff6688;
+    text-align: center;
+    margin-top: clamp(14px, 3.5vw, 20px);
+    min-height: 1.5em;
+    font-style: italic;
+    transition: opacity 0.3s;
+    opacity: 0;
+    line-height: 1.4;
+  }
+  .wrong-msg.show { opacity: 1; }
+
+  /* ══════════════════════════════════════
+     GAME
+  ══════════════════════════════════════ */
+  #scene-game {
+    background: var(--bg);
+    padding: 0;
+  }
+  .game-ui {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: clamp(12px, 3.5vw, 20px) clamp(16px, 5vw, 24px);
+    pointer-events: none;
+    z-index: 5;
+    background: linear-gradient(to bottom, rgba(10,0,8,0.75) 0%, transparent 100%);
+  }
+  .game-stat {
+    font-size: clamp(13px, 4vw, 16px);
+    font-weight: 700;
+    color: var(--pink);
+    text-shadow: 0 0 8px var(--pink-glow);
+    letter-spacing: 1px;
+  }
+  #gameCanvas {
+    display: block;
+    touch-action: none;
+    width: 100%;
+    height: 100%;
+  }
+  .game-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(10px, 3vw, 16px);
+    background: rgba(10,0,8,0.88);
+    z-index: 10;
+    padding: clamp(24px, 7vw, 48px) clamp(20px, 6vw, 40px);
+    transition: opacity 0.4s;
+  }
+  .game-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .game-overlay-title {
+    font-size: clamp(18px, 5.5vw, 26px);
+    font-weight: 800;
+    color: var(--white);
+    text-align: center;
+    text-shadow: 0 0 16px var(--pink-glow);
+    line-height: 1.4;
+  }
+  .game-overlay-sub {
+    font-size: clamp(13px, 3.5vw, 15px);
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.8;
+    margin-bottom: clamp(6px, 2vw, 12px);
+  }
+  .game-instruction {
+    position: absolute;
+    bottom: clamp(16px, 4vw, 28px);
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: clamp(11px, 3vw, 13px);
+    color: var(--muted);
+    pointer-events: none;
+    letter-spacing: 1px;
+  }
+
+  /* ══════════════════════════════════════
+     FINAL
+  ══════════════════════════════════════ */
+  #scene-final { background: #000; }
+  .final-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 360px;
+  }
+  .final-lines {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(8px, 2.5vw, 14px);
+    margin-bottom: clamp(28px, 7vw, 44px);
+    width: 100%;
+    text-align: center;
+  }
+  .final-line {
+    font-size: clamp(16px, 4.5vw, 22px);
+    color: var(--white);
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+    line-height: 1.5;
+    width: 100%;
+  }
+  .final-line.accent {
+    font-size: clamp(17px, 5vw, 24px);
+    color: #ff88aa;
+  }
+  .final-line.last {
+    font-size: clamp(20px, 6vw, 30px);
+    font-weight: 800;
+    color: var(--pink);
+    text-shadow: 0 0 20px var(--pink-glow);
+  }
+  .final-line.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .final-btns {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  .final-btns.show { opacity: 1; }
+  .final-response {
+    font-size: clamp(13px, 4vw, 16px);
+    color: var(--pink);
+    text-align: center;
+    margin-top: clamp(14px, 4vw, 22px);
+    min-height: 1.5em;
+    font-style: italic;
+    text-shadow: 0 0 10px var(--pink-glow);
+    opacity: 0;
+    transition: opacity 0.5s;
+    line-height: 1.5;
+  }
+  .final-response.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Decorative floating hearts -->
+  <div class="floating-hearts" id="floatingHearts"></div>
+
+  <!-- ══ LOADING ══ -->
+  <div class="scene visible active" id="scene-loading">
+    <div class="loading-icon">❤️</div>
+    <div class="loading-text" id="loadingText">accessing your data…</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progressBar"></div>
+    </div>
+  </div>
+
+  <!-- ══ START ══ -->
+  <div class="scene" id="scene-start">
+    <div class="start-inner">
+      <div class="start-emoji">😡❤️</div>
+      <h1 class="title-main">YOU'RE STUCK<br>WITH ME</h1>
+      <p class="subtitle">no escape. don't even try.</p>
+      <button class="btn btn-primary" onclick="startQuiz()">fine 🙄</button>
+    </div>
+  </div>
+
+  <!-- ══ QUIZ ══ -->
+  <div class="scene" id="scene-quiz">
+    <div class="quiz-inner">
+      <div class="progress-dots" id="progressDots"></div>
+      <div class="quiz-q-num" id="quizNum">question 1 of 3</div>
+      <div class="quiz-question" id="quizQuestion"></div>
+      <div class="quiz-options" id="quizOptions"></div>
+      <div class="wrong-msg" id="wrongMsg"></div>
+    </div>
+  </div>
+
+  <!-- ══ GAME ══ -->
+  <div class="scene" id="scene-game">
+    <div class="game-ui">
+      <div class="game-stat" id="gameScore">❤️ 0</div>
+      <div class="game-stat" id="gameTimer">⏱ 20s</div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="game-overlay" id="gameOverlay">
+      <div class="game-overlay-title" id="overlayTitle">catch my hearts 💓</div>
+      <div class="game-overlay-sub" id="overlaySub">tap hearts • dodge bombs<br>catch 8 to win ❤️</div>
+      <button class="btn btn-primary" id="overlayBtn" onclick="startGame()">let's go 💨</button>
+    </div>
+    <div class="game-instruction" id="gameInstruction"></div>
+  </div>
+
+  <!-- ══ FINAL ══ -->
+  <div class="scene" id="scene-final">
+    <div class="final-inner">
+      <div class="final-lines" id="finalLines">
+        <div class="final-line" data-i="0">listen…</div>
+        <div class="final-line" data-i="1">i act like this…</div>
+        <div class="final-line" data-i="2">but it's only because…</div>
+        <div class="final-line accent" data-i="3">i'm addicted to you.</div>
+        <div class="final-line" data-i="4">and yeah…</div>
+        <div class="final-line last" data-i="5">you're mine. ❤️</div>
+      </div>
+      <div class="final-btns" id="finalBtns">
+        <button class="btn btn-primary" onclick="finalChoice(true)">i'm yours ❤️</button>
+        <button class="btn btn-option" onclick="finalChoice(false)">no 😡</button>
+      </div>
+      <div class="final-response" id="finalResponse"></div>
+    </div>
+  </div>
+
+</div>
+<script>
+// ═══════════════════════════════════════════
+//  CONFIG — edit her name here
+// ═══════════════════════════════════════════
+const HER_NAME = "baby";
+
+// ═══════════════════════════════════════════
+//  AUDIO (Web Audio API – no files needed)
+// ═══════════════════════════════════════════
+let audioCtx = null;
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function playTone(freq, type, dur, vol=0.12, delay=0) {
+  try {
+    const ac = getAudio();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ac.currentTime + delay);
+    gain.gain.setValueAtTime(0, ac.currentTime + delay);
+    gain.gain.linearRampToValueAtTime(vol, ac.currentTime + delay + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + delay + dur);
+    osc.start(ac.currentTime + delay);
+    osc.stop(ac.currentTime + delay + dur + 0.05);
+  } catch(e){}
+}
+function sfxClick()   { playTone(520,'sine',0.1,0.1); playTone(700,'sine',0.1,0.06,0.06); }
+function sfxWrong()   { playTone(200,'sawtooth',0.15,0.12); playTone(160,'sawtooth',0.2,0.1,0.1); }
+function sfxCorrect() { [440,550,660].forEach((f,i) => playTone(f,'sine',0.15,0.1,i*0.08)); }
+function sfxHeart()   { playTone(800,'sine',0.08,0.1); playTone(1000,'sine',0.06,0.08,0.05); }
+function sfxBomb()    { playTone(150,'sawtooth',0.2,0.15); playTone(100,'sawtooth',0.25,0.12,0.05); }
+function sfxWin()     { [440,550,660,880].forEach((f,i) => playTone(f,'sine',0.25,0.12,i*0.1)); }
+
+let ambientStarted = false;
+function startAmbient() {
+  if (ambientStarted) return;
+  ambientStarted = true;
+  try {
+    const ac = getAudio();
+    function beat() {
+      playTone(80,'sine',0.4,0.04);
+      setTimeout(beat, 1400 + Math.random()*400);
+    }
+    beat();
+  } catch(e){}
+}
+
+// ═══════════════════════════════════════════
+//  FLOATING HEARTS BACKGROUND
+// ═══════════════════════════════════════════
+function initFloatingHearts() {
+  const wrap = document.getElementById('floatingHearts');
+  const emojis = ['❤️','💕','💗','💓','💖'];
+  for (let i = 0; i < 18; i++) {
+    const el = document.createElement('div');
+    el.className = 'fh';
+    el.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    el.style.left = Math.random()*100 + 'vw';
+    el.style.bottom = '-40px';
+    el.style.fontSize = (12 + Math.random()*14) + 'px';
+    const dur = 8 + Math.random()*10;
+    el.style.animationDuration = dur + 's';
+    el.style.animationDelay = -(Math.random()*dur) + 's';
+    wrap.appendChild(el);
+  }
+}
+initFloatingHearts();
+
+// ═══════════════════════════════════════════
+//  SCENE MANAGEMENT
+// ═══════════════════════════════════════════
+function showScene(id) {
+  // Fade out all active scenes, then hide them fully after transition
+  document.querySelectorAll('.scene.visible').forEach(s => {
+    s.classList.remove('active');
+    setTimeout(() => s.classList.remove('visible'), 550);
+  });
+  const next = document.getElementById('scene-' + id);
+  if (!next) return;
+  // Make it visible (display:flex) then on next frame fade it in
+  next.classList.add('visible');
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => next.classList.add('active'));
+  });
+}
+
+function shake(el) {
+  el.classList.remove('shaking');
+  void el.offsetWidth;
+  el.classList.add('shaking');
+  setTimeout(() => el.classList.remove('shaking'), 600);
+}
+
+function spawnParticles(x, y, emoji='❤️', count=6) {
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.textContent = emoji;
+    const angle = (i / count) * Math.PI * 2;
+    const dist = 40 + Math.random()*50;
+    p.style.setProperty('--tx', Math.cos(angle)*dist + 'px');
+    p.style.setProperty('--ty', Math.sin(angle)*dist - 30 + 'px');
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 800);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  LOADING SCREEN
+// ═══════════════════════════════════════════
+const loadingTexts = [
+  'accessing your data…',
+  'finding your weaknesses…',
+  'loading obsession.exe…',
+  'you can\'t run anymore…',
+  'done. you\'re mine. 😡❤️'
+];
+let loadProgress = 0;
+let loadStep = 0;
+const progressBar = document.getElementById('progressBar');
+const loadingText = document.getElementById('loadingText');
+
+function runLoading() {
+  const interval = setInterval(() => {
+    loadProgress += 1.2 + Math.random()*2;
+    if (loadProgress > 100) loadProgress = 100;
+    progressBar.style.width = loadProgress + '%';
+    const step = Math.floor(loadProgress / 25);
+    if (step !== loadStep && step < loadingTexts.length) {
+      loadStep = step;
+      loadingText.style.opacity = '0';
+      setTimeout(() => {
+        loadingText.textContent = loadingTexts[loadStep];
+        loadingText.style.transition = 'opacity 0.4s';
+        loadingText.style.opacity = '1';
+      }, 200);
+    }
+    if (loadProgress >= 100) {
+      clearInterval(interval);
+      setTimeout(() => showScene('start'), 700);
+    }
+  }, 40);
+}
+setTimeout(runLoading, 300);
+
+// ═══════════════════════════════════════════
+//  QUIZ
+// ═══════════════════════════════════════════
+const quizData = [
+  {
+    q: `who loves you more? 🙃`,
+    options: [
+      { text: 'you 😒', correct: true },
+      { text: 'me', correct: false, msg: 'wrong. try again before i get mad. 😒' }
+    ]
+  },
+  {
+    q: `who do you belong to? 😳`,
+    options: [
+      { text: 'you 😳', correct: true },
+      { text: 'idk', correct: false, msg: "don't play dumb. 🙄" }
+    ]
+  },
+  {
+    q: `can you leave me?`,
+    options: [
+      { text: 'never ❤️', correct: true },
+      { text: 'yes', correct: false, msg: 'say that again and see what happens. 😡' }
+    ]
+  }
+];
+let currentQ = 0;
+
+function buildDots() {
+  const wrap = document.getElementById('progressDots');
+  wrap.innerHTML = '';
+  quizData.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i < currentQ ? ' done' : '');
+    wrap.appendChild(d);
+  });
+}
+
+function loadQuestion() {
+  const data = quizData[currentQ];
+  document.getElementById('quizNum').textContent = `question ${currentQ+1} of ${quizData.length}`;
+  document.getElementById('quizQuestion').textContent = data.q;
+  document.getElementById('wrongMsg').classList.remove('show');
+  buildDots();
+  const optWrap = document.getElementById('quizOptions');
+  optWrap.innerHTML = '';
+  const opts = [...data.options].sort(() => Math.random()-0.5);
+  opts.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-option';
+    btn.textContent = opt.text;
+    btn.onclick = () => answerQuiz(btn, opt);
+    optWrap.appendChild(btn);
+  });
+}
+
+function answerQuiz(btn, opt) {
+  sfxClick();
+  startAmbient();
+  const rect = btn.getBoundingClientRect();
+  if (opt.correct) {
+    sfxCorrect();
+    btn.classList.add('correct');
+    spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, '❤️', 7);
+    document.getElementById('quizOptions').querySelectorAll('button').forEach(b => b.disabled = true);
+    setTimeout(() => {
+      currentQ++;
+      if (currentQ >= quizData.length) {
+        showScene('game');
+        setupGame();
+      } else {
+        loadQuestion();
+      }
+    }, 700);
+  } else {
+    sfxWrong();
+    btn.classList.add('wrong');
+    const msg = document.getElementById('wrongMsg');
+    msg.textContent = opt.msg;
+    msg.classList.add('show');
+    shake(document.getElementById('scene-quiz'));
+    spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, '💢', 4);
+    setTimeout(() => btn.classList.remove('wrong'), 600);
+  }
+}
+
+function startQuiz() {
+  sfxClick();
+  startAmbient();
+  currentQ = 0;
+  loadQuestion();
+  showScene('quiz');
+}
+
+// ═══════════════════════════════════════════
+//  MINI GAME
+// ═══════════════════════════════════════════
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let gameRunning = false;
+let gameScore = 0;
+let gameMisses = 0;
+let gameTimeLeft = 20;
+let gameItems = [];
+let gameTimer = null;
+let gameSpawnTimer = null;
+let animFrame = null;
+const WIN_SCORE = 8;
+const MAX_MISSES = 3;
+
+function setupGame() {
+  const scene = document.getElementById('scene-game');
+  canvas.width = scene.clientWidth || window.innerWidth;
+  canvas.height = scene.clientHeight || window.innerHeight;
+}
+
+function spawnItem() {
+  const isBomb = Math.random() < 0.3;
+  gameItems.push({
+    x: 30 + Math.random() * (canvas.width - 60),
+    y: -30,
+    vy: 2.5 + Math.random() * 2.5,
+    type: isBomb ? 'bomb' : 'heart',
+    size: 28 + Math.random()*10,
+    hit: false,
+    alpha: 1,
+    emoji: isBomb ? '💣' : '❤️'
+  });
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const bg = ctx.createLinearGradient(0,0,0,canvas.height);
+  bg.addColorStop(0,'#0a0008');
+  bg.addColorStop(1,'#110010');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  gameItems = gameItems.filter(it => it.y < canvas.height + 60 && !it.hit);
+  gameItems.forEach(it => {
+    it.y += it.vy;
+    ctx.globalAlpha = it.alpha;
+    ctx.font = it.size + 'px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(it.emoji, it.x, it.y);
+    ctx.globalAlpha = 1;
+  });
+  if (gameRunning) animFrame = requestAnimationFrame(gameLoop);
+}
+
+function handleTap(cx, cy) {
+  if (!gameRunning) return;
+  let hit = false;
+  gameItems = gameItems.map(it => {
+    if (hit || it.hit) return it;
+    const dx = cx - it.x, dy = cy - it.y;
+    if (Math.sqrt(dx*dx+dy*dy) < it.size) {
+      it.hit = true;
+      hit = true;
+      if (it.type === 'heart') {
+        gameScore++;
+        document.getElementById('gameScore').textContent = '❤️ ' + gameScore;
+        sfxHeart();
+        spawnParticles(cx, cy, '❤️', 5);
+        if (gameScore >= WIN_SCORE) endGame(true);
+      } else {
+        gameMisses++;
+        sfxBomb();
+        shake(document.getElementById('scene-game'));
+        spawnParticles(cx, cy, '💥', 5);
+        if (gameMisses >= MAX_MISSES) endGame(false);
+      }
+    }
+    return it;
+  });
+}
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const r = canvas.getBoundingClientRect();
+  handleTap(t.clientX - r.left, t.clientY - r.top);
+}, { passive: false });
+canvas.addEventListener('mousedown', e => {
+  const r = canvas.getBoundingClientRect();
+  handleTap(e.clientX - r.left, e.clientY - r.top);
+});
+
+function startGame() {
+  sfxClick();
+  document.getElementById('gameOverlay').classList.add('hidden');
+  gameRunning = true;
+  gameScore = 0; gameMisses = 0; gameTimeLeft = 20;
+  gameItems = [];
+  document.getElementById('gameScore').textContent = '❤️ 0';
+  document.getElementById('gameTimer').textContent = '⏱ 20s';
+  document.getElementById('gameInstruction').textContent = 'tap ❤️  dodge 💣';
+  gameSpawnTimer = setInterval(spawnItem, 900);
+  gameTimer = setInterval(() => {
+    gameTimeLeft--;
+    document.getElementById('gameTimer').textContent = '⏱ ' + gameTimeLeft + 's';
+    if (gameTimeLeft <= 0) endGame(gameScore >= WIN_SCORE);
+  }, 1000);
+  gameLoop();
+}
+
+function endGame(won) {
+  gameRunning = false;
+  clearInterval(gameTimer);
+  clearInterval(gameSpawnTimer);
+  cancelAnimationFrame(animFrame);
+  document.getElementById('gameInstruction').textContent = '';
+  const overlay = document.getElementById('gameOverlay');
+  const title   = document.getElementById('overlayTitle');
+  const sub     = document.getElementById('overlaySub');
+  const btn     = document.getElementById('overlayBtn');
+  overlay.classList.remove('hidden');
+  if (won) {
+    sfxWin();
+    spawnParticles(canvas.width/2, canvas.height/2, '❤️', 12);
+    title.textContent = 'you caught my heart 💗';
+    sub.textContent   = 'good. don\'t ever let go.';
+    btn.textContent   = 'continue 💕';
+    btn.onclick = () => { sfxClick(); showFinal(); };
+  } else {
+    sfxWrong();
+    title.textContent = 'wow… you dropped my love? 😒';
+    sub.textContent   = `score: ${gameScore}/${WIN_SCORE} — not acceptable.`;
+    btn.textContent   = 'retry 😤';
+    btn.onclick = () => startGame();
+  }
+}
+
+// ═══════════════════════════════════════════
+//  FINAL SCENE
+// ═══════════════════════════════════════════
+function showFinal() {
+  showScene('final');
+  const lines = document.querySelectorAll('.final-line');
+  lines.forEach(l => l.classList.remove('show'));
+  document.getElementById('finalBtns').classList.remove('show');
+  document.getElementById('finalResponse').classList.remove('show');
+  lines.forEach((l, i) => {
+    setTimeout(() => {
+      l.classList.add('show');
+      playTone(300 + i*40, 'sine', 0.3, 0.04);
+    }, i * 900 + 400);
+  });
+  setTimeout(() => {
+    document.getElementById('finalBtns').classList.add('show');
+  }, lines.length * 900 + 800);
+}
+
+function finalChoice(yes) {
+  sfxClick();
+  const res = document.getElementById('finalResponse');
+  const btn = yes
+    ? document.querySelector('.btn-primary[onclick*="true"]')
+    : document.querySelector('.btn-option');
+  if (yes) {
+    sfxWin();
+    res.textContent = 'good. stay like that. 🖤';
+    spawnParticles(window.innerWidth/2, window.innerHeight/2, '❤️', 12);
+    if (btn) { btn.style.transform = 'scale(1.08)'; btn.style.boxShadow = '0 0 32px rgba(255,77,141,0.7)'; }
+  } else {
+    sfxWrong();
+    shake(document.getElementById('scene-final'));
+    res.textContent = 'wrong answer. try again. 😡';
+    if (btn) btn.classList.add('wrong');
+    setTimeout(() => { if (btn) btn.classList.remove('wrong'); }, 600);
+  }
+  res.classList.add('show');
+}
+
+// ═══════════════════════════════════════════
+//  RESIZE
+// ═══════════════════════════════════════════
+window.addEventListener('resize', () => {
+  if (document.getElementById('scene-game').classList.contains('active')) setupGame();
+});
+</script>
+</body>
+</html>
